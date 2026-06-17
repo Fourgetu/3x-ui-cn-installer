@@ -1,6 +1,8 @@
 # 3x-ui 中文自动同步版
 
-本仓库用于跟随官方 [`MHSanaei/3x-ui`](https://github.com/MHSanaei/3x-ui) 最新脚本，并自动生成中文安装脚本和中文管理菜单。
+本仓库用于跟随 [`Fourgetu/3x-ui`](https://github.com/Fourgetu/3x-ui) 定制版最新脚本，并自动生成中文安装脚本和中文管理菜单。
+
+当前定制版基于官方 [`MHSanaei/3x-ui`](https://github.com/MHSanaei/3x-ui)，并加入客户端列表显示节点/VPS 名称等改动。
 
 ## 一键安装
 
@@ -31,7 +33,7 @@ GitHub Actions 会在每天 UTC 03:37 自动运行，也可以在 Actions 页面
 
 同步流程：
 
-1. 从官方仓库下载最新 `install.sh` 和 `x-ui.sh`。
+1. 从 `Fourgetu/3x-ui` 下载最新 `install.sh` 和 `x-ui.sh`。
 2. 使用 `scripts/translate-cn.py` 生成 `install-cn.sh` 和 `x-ui-cn.sh`。
 3. 将脚本里的官方菜单更新地址改为当前 fork 的中文脚本地址。
 4. 读取官方最新 Release 版本并写入 `upstream-version.txt`。
@@ -57,6 +59,8 @@ bash scripts/sync-official.sh
 TARGET_REPO=你的用户名/3x-ui-cn-installer TARGET_BRANCH=main bash scripts/sync-official.sh
 ```
 
-## 官方项目
+## 上游项目
+
+定制主程序：[`Fourgetu/3x-ui`](https://github.com/Fourgetu/3x-ui)
 
 官方原项目：[`MHSanaei/3x-ui`](https://github.com/MHSanaei/3x-ui)

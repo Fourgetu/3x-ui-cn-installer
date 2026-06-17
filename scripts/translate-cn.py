@@ -213,7 +213,7 @@ def translate_file(src: Path, dst: Path) -> None:
     dst.write_text("".join(output), encoding="utf-8", newline="")
 
 
-def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: str) -> None:
+def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: str, release_repo: str) -> None:
     text = path.read_text(encoding="utf-8")
     upstream_owner, upstream_repo = upstream.split("/", 1)
     owner_variants = {upstream_owner, upstream_owner.lower(), upstream_owner.upper()}
@@ -236,6 +236,26 @@ def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: st
         f"{target_raw_base}/x-ui-cn.sh",
         text,
     )
+    text = re.sub(
+        r"https://github\.com/[Mm][Hh][Ss]anaei/3x-ui/raw/[^\"' )]+/x-ui\.sh",
+        f"{target_raw_base}/x-ui-cn.sh",
+        text,
+    )
+    raw_repo_base = f"https://raw.githubusercontent.com/{upstream}/{upstream_ref}"
+    text = re.sub(
+        r"https://raw\.githubusercontent\.com/[Mm][Hh][Ss]anaei/3x-ui/[^\"' )]+/(update\.sh|x-ui\.rc|x-ui\.service\.(?:debian|arch|rhel))",
+        lambda m: f"{raw_repo_base}/{m.group(1)}",
+        text,
+    )
+    for repo in {upstream, "MHSanaei/3x-ui", "mhsanaei/3x-ui"}:
+        text = text.replace(
+            f"https://api.github.com/repos/{repo}/releases",
+            f"https://api.github.com/repos/{release_repo}/releases",
+        )
+        text = text.replace(
+            f"https://github.com/{repo}/releases",
+            f"https://github.com/{release_repo}/releases",
+        )
     path.write_text(text, encoding="utf-8", newline="")
 
 
@@ -244,15 +264,16 @@ def main() -> None:
     parser.add_argument("source", nargs="?")
     parser.add_argument("destination", nargs="?")
     parser.add_argument("--patch-urls", action="store_true")
-    parser.add_argument("--upstream", default="MHSanaei/3x-ui")
-    parser.add_argument("--upstream-ref", default="master")
+    parser.add_argument("--upstream", default="Fourgetu/3x-ui")
+    parser.add_argument("--upstream-ref", default="main")
+    parser.add_argument("--release-repo", default="")
     parser.add_argument("--target-raw-base")
     args = parser.parse_args()
 
     if args.patch_urls:
         if not args.source or not args.target_raw_base:
             parser.error("--patch-urls requires source and --target-raw-base")
-        patch_urls(Path(args.source), args.upstream, args.upstream_ref, args.target_raw_base)
+        patch_urls(Path(args.source), args.upstream, args.upstream_ref, args.target_raw_base, args.release_repo or args.upstream)
         return
 
     if not args.source or not args.destination:

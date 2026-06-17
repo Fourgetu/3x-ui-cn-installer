@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-UPSTREAM_REPO="${UPSTREAM_REPO:-MHSanaei/3x-ui}"
-UPSTREAM_REF="${UPSTREAM_REF:-master}"
+UPSTREAM_REPO="${UPSTREAM_REPO:-Fourgetu/3x-ui}"
+UPSTREAM_REF="${UPSTREAM_REF:-main}"
+RELEASE_REPO="${RELEASE_REPO:-${UPSTREAM_REPO}}"
 TARGET_REPO="${TARGET_REPO:-${GITHUB_REPOSITORY:-}}"
 TARGET_BRANCH="${TARGET_BRANCH:-${GITHUB_REF_NAME:-main}}"
 
@@ -31,14 +32,16 @@ python3 scripts/translate-cn.py "${tmp_dir}/x-ui.sh" x-ui-cn.sh
 python3 scripts/translate-cn.py --patch-urls install-cn.sh \
     --upstream "${UPSTREAM_REPO}" \
     --upstream-ref "${UPSTREAM_REF}" \
+    --release-repo "${RELEASE_REPO}" \
     --target-raw-base "${target_raw_base}"
 
 python3 scripts/translate-cn.py --patch-urls x-ui-cn.sh \
     --upstream "${UPSTREAM_REPO}" \
     --upstream-ref "${UPSTREAM_REF}" \
+    --release-repo "${RELEASE_REPO}" \
     --target-raw-base "${target_raw_base}"
 
-curl -fsSL "https://api.github.com/repos/${UPSTREAM_REPO}/releases/latest" \
+curl -fsSL "https://api.github.com/repos/${RELEASE_REPO}/releases/latest" \
     | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data["tag_name"])' \
     > upstream-version.txt
 
