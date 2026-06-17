@@ -883,11 +883,11 @@ show_status() {
     check_status
     case $? in
         0)
-            echo -e "面板状态： ${green}Running${plain}"
+            echo -e "面板状态： ${green}运行中${plain}"
             show_enable_status
             ;;
         1)
-            echo -e "面板状态： ${yellow}未运行${plain}"
+            echo -e "面板状态： ${yellow}否t 运行中${plain}"
             show_enable_status
             ;;
         2)
@@ -923,9 +923,9 @@ check_xray_status() {
 show_xray_status() {
     check_xray_status
     if [[ $? == 0 ]]; then
-        echo -e "xray state: ${green}Running${plain}"
+        echo -e "xray 状态： ${green}运行中${plain}"
     else
-        echo -e "xray state: ${red}未运行${plain}"
+        echo -e "xray 状态： ${red}否t 运行中${plain}"
     fi
 }
 
@@ -949,9 +949,9 @@ show_mtproto_status() {
         id=$(echo "${name}" | sed -E 's/mtg-([0-9]+)\.toml/\1/')
         bind=$(grep -E '^[[:space:]]*bind-to' "$f" | head -1 | cut -d'"' -f2)
         if echo "${running}" | grep -qx "${name}"; then
-            echo -e "mtproto inbound ${id} (${bind}): ${green}Running${plain}"
+            echo -e "mtproto inbound ${id} (${bind}): ${green}运行中${plain}"
         else
-            echo -e "mtproto inbound ${id} (${bind}): ${red}未运行${plain}"
+            echo -e "mtproto inbound ${id} (${bind}): ${red}否t 运行中${plain}"
         fi
     done
 }
@@ -2072,7 +2072,7 @@ iplimit_main() {
     echo -e "${green}\t7.${plain} Real-Time Logs"
     echo -e "${green}\t8.${plain} 服务状态"
     echo -e "${green}\t9.${plain} 重启服务"
-    echo -e "${green}\t10.${plain} 卸载 Fail2ban and IP Limit"
+    echo -e "${green}\t10.${plain} 卸载 Fail2ban 和 IP 限制"
     echo -e "${green}\t0.${plain} 返回主菜单"
     read -rp "请选择一个选项: " choice
     case "$choice" in
@@ -2266,13 +2266,13 @@ install_iplimit() {
         systemctl enable fail2ban
     fi
 
-    echo -e "${green}IP Limit installed and configured successfully!${plain}\n"
+    echo -e "${green}IP 限制安装并配置成功！${plain}\n"
     before_show_menu
 }
 
 remove_iplimit() {
-    echo -e "${green}\t1.${plain} Only remove IP Limit configurations"
-    echo -e "${green}\t2.${plain} 卸载 Fail2ban and IP Limit"
+    echo -e "${green}\t1.${plain} 仅移除 IP 限制配置"
+    echo -e "${green}\t2.${plain} 卸载 Fail2ban 和 IP 限制"
     echo -e "${green}\t0.${plain} 返回主菜单"
     read -rp "请选择一个选项: " num
     case "$num" in
@@ -2285,7 +2285,7 @@ remove_iplimit() {
             else
                 systemctl restart fail2ban
             fi
-            echo -e "${green}IP Limit removed successfully!${plain}\n"
+            echo -e "${green}IP 限制移除成功！${plain}\n"
             before_show_menu
             ;;
         2)
@@ -2325,7 +2325,7 @@ remove_iplimit() {
                     exit 1
                     ;;
             esac
-            echo -e "${green}Fail2ban and IP Limit removed successfully!${plain}\n"
+            echo -e "${green}Fail2ban 和 IP 限制 removed successfully!${plain}\n"
             before_show_menu
             ;;
         0)
@@ -2517,7 +2517,7 @@ SSH_port_forwarding() {
     fi
 
     if [[ -n "$existing_listenIP" && "$existing_listenIP" != "0.0.0.0" && (-z "$existing_cert" && -z "$existing_key") ]]; then
-        echo -e "\n${green}Current SSH Port Forwarding Configuration:${plain}"
+        echo -e "\n${green}当前 SSH 端口转发配置:${plain}"
         echo -e "Standard SSH command:"
         echo -e "${yellow}ssh -L 2222:${existing_listenIP}:${existing_port} root@${server_ip}${plain}"
         echo -e "\nIf using SSH key:"
@@ -2545,7 +2545,7 @@ SSH_port_forwarding() {
 
                 ${xui_folder}/x-ui setting -listenIP "${config_listenIP}" > /dev/null 2>&1
                 echo -e "${green}listen IP has been set to ${config_listenIP}.${plain}"
-                echo -e "\n${green}SSH Port Forwarding Configuration:${plain}"
+                echo -e "\n${green}SSH 端口转发配置:${plain}"
                 echo -e "Standard SSH command:"
                 echo -e "${yellow}ssh -L 2222:${config_listenIP}:${existing_port} root@${server_ip}${plain}"
                 echo -e "\nIf using SSH key:"
@@ -3076,7 +3076,7 @@ show_usage() {
     echo -e "┌────────────────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}                       │
 │                                                                │
-│  ${blue}x-ui${plain}                       - Admin Management Script          │
+│  ${blue}x-ui${plain}                       - 管理脚本          │
 │  ${blue}x-ui start${plain}                 - 启动                            │
 │  ${blue}x-ui stop${plain}                  - 停止                             │
 │  ${blue}x-ui restart${plain}               - 重启                          │
@@ -3099,16 +3099,16 @@ show_usage() {
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
-│   ${green}3X-UI Panel Management Script${plain}                │
-│   ${green}0.${plain} 退出 Script                               │
+│   ${green}3X-UI 面板管理脚本${plain}                │
+│   ${green}0.${plain} 退出脚本                               │
 │────────────────────────────────────────────────│
 │   ${green}1.${plain} 安装                                   │
 │   ${green}2.${plain} 更新                                    │
-│   ${green}3.${plain} 更新 Menu                               │
-│   ${green}4.${plain} Legacy Version                            │
+│   ${green}3.${plain} 更新菜单                               │
+│   ${green}4.${plain} 历史版本                            │
 │   ${green}5.${plain} 卸载                                 │
 │────────────────────────────────────────────────│
-│   ${green}6.${plain} Reset Username & Password                 │
+│   ${green}6.${plain} 重置用户名和密码                 │
 │   ${green}7.${plain} 重置网页根路径                       │
 │   ${green}8.${plain} 重置设置                            │
 │   ${green}9.${plain} 修改端口                               │
@@ -3119,19 +3119,19 @@ show_menu() {
 │  ${green}13.${plain} 重启                                   │
 |  ${green}14.${plain} 重启 Xray                              │
 │  ${green}15.${plain} 查看状态                              │
-│  ${green}16.${plain} Logs Management                           │
+│  ${green}16.${plain} 日志管理                           │
 │────────────────────────────────────────────────│
 │  ${green}17.${plain} 启用开机自启                          │
 │  ${green}18.${plain} 禁用开机自启                         │
 │────────────────────────────────────────────────│
 │  ${green}19.${plain} SSL 证书管理                │
-│  ${green}20.${plain} Cloudflare SSL Certificate                │
-│  ${green}21.${plain} IP Limit Management                       │
+│  ${green}20.${plain} Cloudflare SSL 证书                │
+│  ${green}21.${plain} IP 限制管理                       │
 │  ${green}22.${plain} 防火墙管理                       │
-│  ${green}23.${plain} SSH Port Forwarding Management            │
+│  ${green}23.${plain} SSH 端口转发管理            │
 │────────────────────────────────────────────────│
 │  ${green}24.${plain} 启用 BBR                                │
-│  ${green}25.${plain} 更新 Geo Files                          │
+│  ${green}25.${plain} 更新 Geo 文件                          │
 │  ${green}26.${plain} Ookla 测速                        │
 │────────────────────────────────────────────────│
 │  ${green}27.${plain} PostgreSQL 管理                     │

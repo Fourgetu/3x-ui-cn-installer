@@ -1496,7 +1496,7 @@ install_x-ui() {
     echo -e "┌───────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}              │
 │                                                       │
-│  ${blue}x-ui${plain}              - Admin Management Script          │
+│  ${blue}x-ui${plain}              - 管理脚本          │
 │  ${blue}x-ui start${plain}        - 启动                            │
 │  ${blue}x-ui stop${plain}         - 停止                             │
 │  ${blue}x-ui restart${plain}      - 重启                          │
