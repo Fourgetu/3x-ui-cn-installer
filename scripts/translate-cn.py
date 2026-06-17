@@ -256,6 +256,38 @@ def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: st
             f"https://github.com/{repo}/releases",
             f"https://github.com/{release_repo}/releases",
         )
+    text = text.replace(
+        "# If the panel is already installed but no certificate is configured, prompt for SSL now",
+        "# Existing installs should upgrade without stopping for SSL setup.\n"
+        "            # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
+    )
+    text = text.replace(
+        "# Existing install: if no cert configured, prompt user for SSL setup",
+        "# Existing installs should upgrade without stopping for SSL setup.\n"
+        "        # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
+    )
+    text = text.replace(
+        'prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"',
+        'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
+        '                    prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"\n'
+        '                else\n'
+        '                    SSL_SCHEME="http"\n'
+        '                    SSL_HOST="${server_ip}"\n'
+        '                    echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
+        '                    echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
+        '                fi',
+    )
+    text = text.replace(
+        'prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"',
+        'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
+        '                prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"\n'
+        '            else\n'
+        '                SSL_SCHEME="http"\n'
+        '                SSL_HOST="${server_ip}"\n'
+        '                echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
+        '                echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
+        '            fi',
+    )
     path.write_text(text, encoding="utf-8", newline="")
 
 

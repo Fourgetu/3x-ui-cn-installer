@@ -1241,7 +1241,8 @@ EOF
             ${xui_folder}/x-ui setting -webBasePath "${config_webBasePath}"
             echo -e "${green}New 网页根路径： ${config_webBasePath}${plain}"
 
-            # If the panel is already installed but no certificate is configured, prompt for SSL now
+            # Existing installs should upgrade without stopping for SSL setup.
+            # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.
             if [[ -z "${existing_cert}" ]]; then
                 echo ""
                 echo -e "${green}═══════════════════════════════════════════${plain}"
@@ -1249,7 +1250,14 @@ EOF
                 echo -e "${green}═══════════════════════════════════════════${plain}"
                 echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
                 echo ""
-                prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"
+                if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then
+                    prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"
+                else
+                    SSL_SCHEME="http"
+                    SSL_HOST="${server_ip}"
+                    echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"
+                    echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"
+                fi
                 echo -e "${green}访问地址：  ${SSL_SCHEME}://${SSL_HOST}:${existing_port}/${config_webBasePath}${plain}"
             else
                 # If a cert already exists, just show the access URL
@@ -1280,7 +1288,8 @@ EOF
             echo -e "${green}Username, Password, and WebBasePath are properly set.${plain}"
         fi
 
-        # Existing install: if no cert configured, prompt user for SSL setup
+        # Existing installs should upgrade without stopping for SSL setup.
+        # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.
         # Properly detect empty cert by checking if cert: line exists and has content after it
         existing_cert=$(${xui_folder}/x-ui setting -getCert true | grep 'cert:' | awk -F': ' '{print $2}' | tr -d '[:space:]')
         if [[ -z "$existing_cert" ]]; then
@@ -1290,7 +1299,14 @@ EOF
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
             echo ""
-            prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"
+            if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then
+                prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"
+            else
+                SSL_SCHEME="http"
+                SSL_HOST="${server_ip}"
+                echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"
+                echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"
+            fi
             echo -e "${green}访问地址：  ${SSL_SCHEME}://${SSL_HOST}:${existing_port}/${existing_webBasePath}${plain}"
         else
             echo -e "${green}SSL certificate already configured. 否 action needed.${plain}"
