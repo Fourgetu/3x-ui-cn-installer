@@ -202,6 +202,33 @@ def translate_text(text: str) -> str:
     translated = translated.replace("default is a random password", "默认随机密码")
     translated = translated.replace("leave empty to skip", "留空跳过")
     translated = translated.replace("leave empty to abort", "留空取消")
+    translated = translated.replace(
+        "Please choose which port to use (default is 80): ",
+        "请选择用于签发证书的端口（默认 80）: ",
+    )
+    translated = translated.replace(
+        "Would you like to modify --reloadcmd for ACME? (y/n): ",
+        "是否修改 ACME 证书续期后的重载命令？(y/n): ",
+    )
+    translated = translated.replace(
+        "Would you like to set this certificate for the panel? (y/n): ",
+        "是否将此证书设置到面板？(y/n): ",
+    )
+    translated = translated.replace(
+        "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: ",
+        "是否自定义面板端口？（不自定义将随机生成）[y/n]: ",
+    )
+    translated = translated.replace("Please set up the panel port: ", "请输入面板端口: ")
+    translated = translated.replace("Your Panel Port is:", "面板端口为:")
+    translated = translated.replace("Generated random port:", "已生成随机端口:")
+    translated = translated.replace(
+        "SQLite     (default — recommended for < 500 clients)",
+        "SQLite     （默认，建议少于 500 个客户端时使用）",
+    )
+    translated = translated.replace(
+        "PostgreSQL (recommended for high client counts / many nodes)",
+        "PostgreSQL （建议大量客户端/多节点时使用）",
+    )
     translated = translated.replace("y/n", "y/n")
     return translated
 

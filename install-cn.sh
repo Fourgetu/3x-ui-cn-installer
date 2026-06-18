@@ -645,7 +645,7 @@ ssl_cert_issue() {
 
     # get the port number for the standalone server
     local WebPort=80
-    prompt_or_default WebPort "Please choose which port to use (default is 80): " "80" XUI_ACME_HTTP_PORT
+    prompt_or_default WebPort "请选择用于签发证书的端口（默认 80）: " "80" XUI_ACME_HTTP_PORT
     if [[ ${WebPort} -gt 65535 || ${WebPort} -lt 1 ]]; then
         echo -e "${yellow}Your input ${WebPort} is invalid, will use default port 80.${plain}"
         WebPort=80
@@ -680,7 +680,7 @@ ssl_cert_issue() {
     if [[ "$NONINTERACTIVE" == "1" ]]; then
         setReloadcmd="n"
     else
-        read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
+        read -rp "是否修改 ACME 证书续期后的重载命令？(y/n): " setReloadcmd
     fi
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
         echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; systemctl restart x-ui"
@@ -750,7 +750,7 @@ ssl_cert_issue() {
     if [[ "$NONINTERACTIVE" == "1" ]]; then
         setPanel="y"
     else
-        read -rp "Would you like to set this certificate for the panel? (y/n): " setPanel
+        read -rp "是否将此证书设置到面板？(y/n): " setPanel
     fi
     if [[ "$setPanel" == "y" || "$setPanel" == "Y" ]]; then
         local webCertFile="/root/cert/${domain}/fullchain.pem"
@@ -1021,8 +1021,8 @@ config_after_install() {
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "${green}     数据库选择                    ${plain}"
             echo -e "${green}═══════════════════════════════════════════${plain}"
-            echo -e "  1) SQLite     (default — recommended for < 500 clients)"
-            echo -e "  2) PostgreSQL (recommended for high client counts / many nodes)"
+            echo -e "  1) SQLite     （默认，建议少于 500 个客户端时使用）"
+            echo -e "  2) PostgreSQL （建议大量客户端/多节点时使用）"
             if [[ "$NONINTERACTIVE" == "1" ]]; then
                 if [[ "${XUI_DB_TYPE:-sqlite}" == "postgres" ]]; then
                     db_choice="2"
@@ -1153,13 +1153,13 @@ EOF
                     echo -e "${yellow}Generated random port: ${config_port}${plain}"
                 fi
             else
-                read -rp "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: " config_confirm
+                read -rp "是否自定义面板端口？（不自定义将随机生成）[y/n]: " config_confirm
                 if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-                    read -rp "Please set up the panel port: " config_port
-                    echo -e "${yellow}Your Panel Port is: ${config_port}${plain}"
+                    read -rp "请输入面板端口: " config_port
+                    echo -e "${yellow}面板端口为: ${config_port}${plain}"
                 else
                     config_port=$(shuf -i 1024-62000 -n 1)
-                    echo -e "${yellow}Generated random port: ${config_port}${plain}"
+                    echo -e "${yellow}已生成随机端口: ${config_port}${plain}"
                 fi
             fi
 
