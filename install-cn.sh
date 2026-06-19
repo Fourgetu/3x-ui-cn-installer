@@ -1147,10 +1147,10 @@ EOF
             if [[ "$NONINTERACTIVE" == "1" ]]; then
                 if [[ -n "${XUI_PANEL_PORT:-}" ]]; then
                     config_port="${XUI_PANEL_PORT}"
-                    echo -e "${yellow}Your Panel Port is: ${config_port}${plain}"
+                    echo -e "${yellow}面板端口为: ${config_port}${plain}"
                 else
                     config_port=$(shuf -i 1024-62000 -n 1)
-                    echo -e "${yellow}Generated random port: ${config_port}${plain}"
+                    echo -e "${yellow}已生成随机端口: ${config_port}${plain}"
                 fi
             else
                 read -rp "是否自定义面板端口？（不自定义将随机生成）[y/n]: " config_confirm

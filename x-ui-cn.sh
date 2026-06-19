@@ -1628,7 +1628,7 @@ ssl_cert_issue_for_ip() {
     local webCertFile="${certPath}/fullchain.pem"
     local webKeyFile="${certPath}/privkey.pem"
 
-    read -rp "Would you like to set this certificate for the panel? (y/n): " setPanel
+    read -rp "是否将此证书设置到面板？(y/n): " setPanel
     if [[ "$setPanel" == "y" || "$setPanel" == "Y" ]]; then
         if [[ -f "$webCertFile" && -f "$webKeyFile" ]]; then
             ${xui_folder}/x-ui cert -webCert "$webCertFile" -webCertKey "$webKeyFile"
@@ -1757,7 +1757,7 @@ ssl_cert_issue() {
 
     # get the port number for the standalone server
     local WebPort=80
-    read -rp "Please choose which port to use (default is 80): " WebPort
+    read -rp "请选择用于签发证书的端口（默认 80）: " WebPort
     if [[ ${WebPort} -gt 65535 || ${WebPort} -lt 1 ]]; then
         LOGE "Your input ${WebPort} is invalid, will use default port 80."
         WebPort=80
@@ -1783,7 +1783,7 @@ ssl_cert_issue() {
 
     LOGI "Default --reloadcmd for ACME is: ${yellow}x-ui restart"
     LOGI "This command will run on every certificate issue and renew."
-    read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
+    read -rp "是否修改 ACME 证书续期后的重载命令？(y/n): " setReloadcmd
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
         echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
         echo -e "${green}\t2.${plain} Input your own command"
@@ -1844,7 +1844,7 @@ ssl_cert_issue() {
     fi
 
     # Prompt user to set panel paths after successful certificate installation
-    read -rp "Would you like to set this certificate for the panel? (y/n): " setPanel
+    read -rp "是否将此证书设置到面板？(y/n): " setPanel
     if [[ "$setPanel" == "y" || "$setPanel" == "Y" ]]; then
         local webCertFile="/root/cert/${domain}/fullchain.pem"
         local webKeyFile="/root/cert/${domain}/privkey.pem"
@@ -1948,7 +1948,7 @@ ssl_cert_issue_CF() {
 
         LOGI "Default --reloadcmd for ACME is: ${yellow}x-ui restart"
         LOGI "This command will run on every certificate issue and renew."
-        read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
+        read -rp "是否修改 ACME 证书续期后的重载命令？(y/n): " setReloadcmd
         if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
             echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
             echo -e "${green}\t2.${plain} Input your own command"
@@ -1993,7 +1993,7 @@ ssl_cert_issue_CF() {
         fi
 
         # Prompt user to set panel paths after successful certificate installation
-        read -rp "Would you like to set this certificate for the panel? (y/n): " setPanel
+        read -rp "是否将此证书设置到面板？(y/n): " setPanel
         if [[ "$setPanel" == "y" || "$setPanel" == "Y" ]]; then
             local webCertFile="${certPath}/fullchain.pem"
             local webKeyFile="${certPath}/privkey.pem"
