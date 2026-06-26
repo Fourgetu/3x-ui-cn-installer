@@ -155,6 +155,24 @@ update() {
     fi
 }
 
+update_dev() {
+    confirm "This will update x-ui to the latest DEV commit (the rolling 'dev-latest' build, not a stable release). Your data is preserved. Continue?" "y"
+    if [[ $? != 0 ]]; then
+        LOGE "Cancelled"
+        if [[ $# == 0 ]]; then
+            before_show_menu
+        fi
+        return 0
+    fi
+    # XUI_UPDATE_TAG tells update.sh to install the dev-latest pre-release
+    # instead of the latest stable tag.
+    XUI_UPDATE_TAG="dev-latest" bash <(curl -Ls https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh)
+    if [[ $? == 0 ]]; then
+        LOGI "Dev update is complete, Panel has automatically restarted "
+        before_show_menu
+    fi
+}
+
 update_menu() {
     echo -e "${yellow}正在更新菜单${plain}"
     confirm "This function will update the menu to the latest changes." "y"
@@ -235,9 +253,20 @@ uninstall() {
         systemctl reset-failed
     fi
 
+    local panel_used_postgres="false"
+    local db_env_file
+    db_env_file="$(xui_env_file_path)"
+    if [[ -r "$db_env_file" ]] && grep -q '^XUI_DB_TYPE=postgres' "$db_env_file"; then
+        panel_used_postgres="true"
+    fi
+
     rm /etc/x-ui/ -rf
     rm ${xui_folder}/ -rf
-    rm -f "$(xui_env_file_path)"
+    rm -f "$db_env_file"
+
+    if [[ "$panel_used_postgres" == "true" ]] && postgresql_installed; then
+        purge_postgresql
+    fi
 
     echo ""
     echo -e "卸载成功。\n"
@@ -2709,6 +2738,63 @@ pg_require_installed() {
     fi
 }
 
+# Completely removes the PostgreSQL server and ALL of its databases from the system.
+# Gated behind an explicit confirmation because this is system-wide and irreversible:
+# any other application sharing this PostgreSQL instance loses its data too. Mirrors the
+# package names used by pg_install_local() so the right packages are removed per distro.
+purge_postgresql() {
+    echo ""
+    echo -e "${yellow}This panel was using PostgreSQL.${plain}"
+    echo -e "${red}WARNING:${plain} purging removes the PostgreSQL server and ${red}ALL${plain} of its databases on"
+    echo -e "this machine, including any used by other applications. This cannot be undone."
+    confirm "Also purge PostgreSQL and delete all of its data?" "n"
+    if [[ $? != 0 ]]; then
+        LOGI "Left PostgreSQL installed; its data was not removed."
+        return 0
+    fi
+
+    if [[ $release == "alpine" ]]; then
+        rc-service postgresql stop 2> /dev/null
+        rc-update del postgresql 2> /dev/null
+    else
+        systemctl stop "$(pg_systemd_unit)" 2> /dev/null
+        systemctl disable "$(pg_systemd_unit)" 2> /dev/null
+    fi
+
+    case "${release}" in
+        ubuntu | debian | armbian)
+            apt-get -y --purge remove 'postgresql*'
+            apt-get -y autoremove --purge
+            ;;
+        fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
+            dnf remove -y postgresql postgresql-server postgresql-contrib
+            ;;
+        centos)
+            if [[ "${VERSION_ID}" =~ ^7 ]]; then
+                yum remove -y postgresql postgresql-server postgresql-contrib
+            else
+                dnf remove -y postgresql postgresql-server postgresql-contrib
+            fi
+            ;;
+        arch | manjaro | parch)
+            pacman -Rns --noconfirm postgresql
+            ;;
+        opensuse-tumbleweed | opensuse-leap)
+            zypper -q remove -y postgresql postgresql-server postgresql-contrib
+            ;;
+        alpine)
+            apk del postgresql postgresql-contrib postgresql-client
+            ;;
+        *)
+            LOGE "Unsupported distro for automatic PostgreSQL purge: ${release}. Remove it manually."
+            return 1
+            ;;
+    esac
+
+    rm -rf /var/lib/postgresql /var/lib/pgsql /var/lib/postgres /etc/postgresql
+    LOGI "PostgreSQL has been purged."
+}
+
 # Installs a local PostgreSQL server and creates a dedicated xui user/database.
 # Progress goes to stderr; on success the connection DSN is printed to stdout so
 # callers can capture it. Mirrors install_postgres_local() from install.sh, so the
@@ -3104,6 +3190,7 @@ show_usage() {
 │  ${blue}x-ui log${plain}                   - Check logs                       │
 │  ${blue}x-ui banlog${plain}                - Check Fail2ban ban logs          │
 │  ${blue}x-ui update${plain}                - 更新                           │
+│  ${blue}x-ui update-dev${plain}            - 更新 to Dev channel (latest)   │
 │  ${blue}x-ui update-all-geofiles${plain}   - 更新 all geo files             │
 │  ${blue}x-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
 │  ${blue}x-ui legacy${plain}                - Legacy version                   │
@@ -3115,46 +3202,46 @@ show_usage() {
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
-│   ${green}3X-UI 面板管理脚本${plain}                │
-│   ${green}0.${plain} 退出脚本                               │
+│  ${green}3X-UI 面板管理脚本${plain}                │
+│  ${green}0.${plain} 退出脚本                               │
 │────────────────────────────────────────────────│
-│   ${green}1.${plain} 安装                                   │
-│   ${green}2.${plain} 更新                                    │
-│   ${green}3.${plain} 更新菜单                               │
-│   ${green}4.${plain} 历史版本                            │
-│   ${green}5.${plain} 卸载                                 │
+│  ${green}1.${plain} 安装                                   │
+│  ${green}2.${plain} 更新                                    │
+│  ${green}3.${plain} 更新 to Dev Channel (latest commit)     │
+│  ${green}4.${plain} 更新菜单                               │
+│  ${green}5.${plain} 历史版本                            │
+│  ${green}6.${plain} 卸载                                 │
 │────────────────────────────────────────────────│
-│   ${green}6.${plain} 重置用户名和密码                 │
-│   ${green}7.${plain} 重置网页根路径                       │
-│   ${green}8.${plain} 重置设置                            │
-│   ${green}9.${plain} 修改端口                               │
-│  ${green}10.${plain} 查看当前设置                     │
+│  ${green}7.${plain} 重置用户名和密码                 │
+│  ${green}8.${plain} 重置网页根路径                       │
+│  ${green}9.${plain} 重置设置                            │
+│  ${green}10.${plain} 修改端口                              │
+│  ${green}11.${plain} 查看当前设置                    │
 │────────────────────────────────────────────────│
-│  ${green}11.${plain} 启动                                     │
-│  ${green}12.${plain} 停止                                      │
-│  ${green}13.${plain} 重启                                   │
-|  ${green}14.${plain} 重启 Xray                              │
-│  ${green}15.${plain} 查看状态                              │
-│  ${green}16.${plain} 日志管理                           │
+│  ${green}12.${plain} 启动                                    │
+│  ${green}13.${plain} 停止                                     │
+│  ${green}14.${plain} 重启                                  │
+|  ${green}15.${plain} 重启 Xray                             │
+│  ${green}16.${plain} 查看状态                             │
+│  ${green}17.${plain} 日志管理                          │
 │────────────────────────────────────────────────│
-│  ${green}17.${plain} 启用开机自启                          │
-│  ${green}18.${plain} 禁用开机自启                         │
+│  ${green}18.${plain} 启用开机自启                         │
+│  ${green}19.${plain} 禁用开机自启                        │
 │────────────────────────────────────────────────│
-│  ${green}19.${plain} SSL 证书管理                │
-│  ${green}20.${plain} Cloudflare SSL 证书                │
-│  ${green}21.${plain} IP 限制管理                       │
-│  ${green}22.${plain} 防火墙管理                       │
-│  ${green}23.${plain} SSH 端口转发管理            │
+│  ${green}20.${plain} SSL 证书管理               │
+│  ${green}21.${plain} Cloudflare SSL 证书               │
+│  ${green}22.${plain} IP 限制管理                      │
+│  ${green}23.${plain} 防火墙管理                      │
+│  ${green}24.${plain} SSH 端口转发管理           │
+│  ${green}25.${plain} PostgreSQL 管理                    │
 │────────────────────────────────────────────────│
-│  ${green}24.${plain} 启用 BBR                                │
-│  ${green}25.${plain} 更新 Geo 文件                          │
-│  ${green}26.${plain} Ookla 测速                        │
-│────────────────────────────────────────────────│
-│  ${green}27.${plain} PostgreSQL 管理                     │
+│  ${green}26.${plain} 启用 BBR                               │
+│  ${green}27.${plain} 更新 Geo 文件                         │
+│  ${green}28.${plain} Ookla 测速                       │
 ╚────────────────────────────────────────────────╝
 "
     show_status
-    echo && read -rp "请输入你的选择 [0-27]: " num
+    echo && read -rp "请输入你的选择 [0-28]: " num
 
     case "${num}" in
         0)
@@ -3167,82 +3254,85 @@ show_menu() {
             check_install && update
             ;;
         3)
-            check_install && update_menu
+            check_install && update_dev
             ;;
         4)
-            check_install && legacy_version
+            check_install && update_menu
             ;;
         5)
-            check_install && uninstall
+            check_install && legacy_version
             ;;
         6)
-            check_install && reset_user
+            check_install && uninstall
             ;;
         7)
-            check_install && reset_webbasepath
+            check_install && reset_user
             ;;
         8)
-            check_install && reset_config
+            check_install && reset_webbasepath
             ;;
         9)
-            check_install && set_port
+            check_install && reset_config
             ;;
         10)
-            check_install && check_config
+            check_install && set_port
             ;;
         11)
-            check_install && start
+            check_install && check_config
             ;;
         12)
-            check_install && stop
+            check_install && start
             ;;
         13)
-            check_install && restart
+            check_install && stop
             ;;
         14)
-            check_install && restart_xray
+            check_install && restart
             ;;
         15)
-            check_install && status
+            check_install && restart_xray
             ;;
         16)
-            check_install && show_log
+            check_install && status
             ;;
         17)
-            check_install && enable
+            check_install && show_log
             ;;
         18)
-            check_install && disable
+            check_install && enable
             ;;
         19)
-            ssl_cert_issue_main
+            check_install && disable
             ;;
         20)
-            ssl_cert_issue_CF
+            ssl_cert_issue_main
             ;;
         21)
-            iplimit_main
+            ssl_cert_issue_CF
             ;;
         22)
-            firewall_menu
+            iplimit_main
             ;;
         23)
-            SSH_port_forwarding
+            firewall_menu
             ;;
         24)
-            bbr_menu
+            SSH_port_forwarding
             ;;
         25)
-            update_geo
-            ;;
-        26)
-            run_speedtest
-            ;;
-        27)
             postgresql_menu
             ;;
+        26)
+            bbr_menu
+            ;;
+        27)
+            update_geo
+            ;;
+        28)
+            run_speedtest
+            ;;
         *)
-            LOGE "Please enter the correct number [0-27]"
+            LOGE "Please enter the correct number [0-28]"
             ;;
     esac
 }
@@ -3284,6 +3374,9 @@ if [[ $# > 0 ]]; then
             ;;
         "update")
             check_install 0 && update 0
+            ;;
+        "update-dev")
+            check_install 0 && update_dev 0
             ;;
         "legacy")
             check_install 0 && legacy_version 0
