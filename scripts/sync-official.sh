@@ -23,8 +23,49 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 raw_base="https://raw.githubusercontent.com/${UPSTREAM_REPO}/${UPSTREAM_REF}"
 target_raw_base="https://raw.githubusercontent.com/${TARGET_REPO}/${TARGET_BRANCH}"
 
-curl -fsSL "${raw_base}/install.sh" -o "${tmp_dir}/install.sh"
-curl -fsSL "${raw_base}/x-ui.sh" -o "${tmp_dir}/x-ui.sh"
+github_raw_api_url() {
+    local url="$1" path owner repo ref
+    case "$url" in
+        https://raw.githubusercontent.com/*) ;;
+        *) return 1 ;;
+    esac
+
+    path="${url#https://raw.githubusercontent.com/}"
+    owner="${path%%/*}"
+    path="${path#*/}"
+    repo="${path%%/*}"
+    path="${path#*/}"
+    ref="${path%%/*}"
+    path="${path#*/}"
+
+    [[ -n "$owner" && -n "$repo" && -n "$ref" && -n "$path" ]] || return 1
+    printf 'https://api.github.com/repos/%s/%s/contents/%s?ref=%s\n' "$owner" "$repo" "$path" "$ref"
+}
+
+download_github_file() {
+    local output="$1" url="$2" api_url tmp
+    tmp="${output}.tmp.$$"
+
+    if curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 -o "$tmp" "$url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    api_url="$(github_raw_api_url "$url")" || return 1
+
+    if curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 \
+        -H 'Accept: application/vnd.github.raw' -o "$tmp" "$api_url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 1
+}
+
+download_github_file "${tmp_dir}/install.sh" "${raw_base}/install.sh"
+download_github_file "${tmp_dir}/x-ui.sh" "${raw_base}/x-ui.sh"
 
 python3 scripts/translate-cn.py "${tmp_dir}/install.sh" install-cn.sh
 python3 scripts/translate-cn.py "${tmp_dir}/x-ui.sh" x-ui-cn.sh

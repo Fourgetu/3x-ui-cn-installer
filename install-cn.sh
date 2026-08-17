@@ -64,6 +64,47 @@ is_domain() {
     [[ "$1" =~ ^([A-Za-z0-9](-*[A-Za-z0-9])*\.)+(xn--[a-z0-9]{2,}|[A-Za-z]{2,})$ ]] && return 0 || return 1
 }
 
+github_raw_api_url() {
+    local url="$1" path owner repo ref
+    case "$url" in
+        https://raw.githubusercontent.com/*) ;;
+        *) return 1 ;;
+    esac
+
+    path="${url#https://raw.githubusercontent.com/}"
+    owner="${path%%/*}"
+    path="${path#*/}"
+    repo="${path%%/*}"
+    path="${path#*/}"
+    ref="${path%%/*}"
+    path="${path#*/}"
+
+    [[ -n "$owner" && -n "$repo" && -n "$ref" && -n "$path" ]] || return 1
+    printf 'https://api.github.com/repos/%s/%s/contents/%s?ref=%s\n' "$owner" "$repo" "$path" "$ref"
+}
+
+download_github_file() {
+    local output="$1" url="$2" api_url tmp
+    tmp="${output}.tmp.$$"
+
+    if curl -4fLR --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 -o "$tmp" "$url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    api_url="$(github_raw_api_url "$url")" || return 1
+
+    if curl -4fsSL --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 \
+        -H 'Accept: application/vnd.github.raw' -o "$tmp" "$api_url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 1
+}
+
 # acme.sh's standalone server binds IPv4 by default; --listen-v6 makes it
 # v6-only, which breaks HTTP-01 validation when the domain's A record points
 # at this host's IPv4 (#4994). Only force IPv6 when the host has no global
@@ -1407,7 +1448,7 @@ _install_xui_service_unit() {
 
     rm -f "$temp_file"
     if [[ "$source_is_url" == "true" ]]; then
-        curl -fLRo "$temp_file" "$source" > /dev/null 2>&1
+        download_github_file "$temp_file" "$source" > /dev/null 2>&1
     else
         cp -f "$source" "$temp_file" > /dev/null 2>&1
     fi
@@ -1481,7 +1522,7 @@ install_x-ui() {
     fi
     local xui_script_temp="/usr/bin/x-ui-temp.$$"
     rm -f "${xui_script_temp}"
-    curl -fLRo "${xui_script_temp}" https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh
+    download_github_file "${xui_script_temp}" https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh
     if [[ $? -ne 0 ]]; then
         rm -f "${xui_script_temp}"
         echo -e "${red}下载 x-ui.sh 失败${plain}"
@@ -1573,7 +1614,7 @@ install_x-ui() {
     if [[ $release == "alpine" ]]; then
         xui_rc_temp="/etc/init.d/x-ui.tmp.$$"
         rm -f "${xui_rc_temp}"
-        curl -fLRo "${xui_rc_temp}" https://raw.githubusercontent.com/Fourgetu/3x-ui/main/x-ui.rc
+        download_github_file "${xui_rc_temp}" https://raw.githubusercontent.com/Fourgetu/3x-ui/main/x-ui.rc
         if [[ $? -ne 0 ]]; then
             rm -f "${xui_rc_temp}"
             echo -e "${red}Failed to download x-ui.rc${plain}"

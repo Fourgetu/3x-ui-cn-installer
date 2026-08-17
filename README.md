@@ -10,6 +10,12 @@
 bash <(curl -fsSL https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh)
 ```
 
+如果服务器访问 `raw.githubusercontent.com` 返回 429，可以使用 GitHub API 兜底地址：
+
+```bash
+bash <(curl -fsSL -H 'Accept: application/vnd.github.raw' 'https://api.github.com/repos/Fourgetu/3x-ui-cn-installer/contents/install-cn.sh?ref=main')
+```
+
 如果你再次 fork 本仓库，请把命令里的 `Fourgetu/3x-ui-cn-installer` 改成你的仓库名，例如：
 
 ```bash

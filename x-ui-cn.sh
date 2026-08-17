@@ -62,6 +62,63 @@ acme_listen_flag() {
     fi
 }
 
+github_raw_api_url() {
+    local url="$1" path owner repo ref
+    case "$url" in
+        https://raw.githubusercontent.com/*) ;;
+        *) return 1 ;;
+    esac
+
+    path="${url#https://raw.githubusercontent.com/}"
+    owner="${path%%/*}"
+    path="${path#*/}"
+    repo="${path%%/*}"
+    path="${path#*/}"
+    ref="${path%%/*}"
+    path="${path#*/}"
+
+    [[ -n "$owner" && -n "$repo" && -n "$ref" && -n "$path" ]] || return 1
+    printf 'https://api.github.com/repos/%s/%s/contents/%s?ref=%s\n' "$owner" "$repo" "$path" "$ref"
+}
+
+download_github_file() {
+    local output="$1" url="$2" api_url tmp
+    tmp="${output}.tmp.$$"
+
+    if curl -4fLR --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 -o "$tmp" "$url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    api_url="$(github_raw_api_url "$url")" || return 1
+
+    if curl -4fsSL --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 \
+        -H 'Accept: application/vnd.github.raw' -o "$tmp" "$api_url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 1
+}
+
+run_github_script() {
+    local url="$1" tmp rc
+    shift
+    tmp="$(mktemp)"
+
+    if ! download_github_file "$tmp" "$url"; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    bash "$tmp" "$@"
+    rc=$?
+    rm -f "$tmp"
+    return "$rc"
+}
+
 # check root
 [[ $EUID -ne 0 ]] && LOGE "ERROR: You must be root to run this script! \n" && exit 1
 
@@ -129,7 +186,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh)
+    run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -148,7 +205,7 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh)
+    run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh
     if [[ $? == 0 ]]; then
         LOGI "更新 is complete, Panel has automatically restarted "
         before_show_menu
@@ -166,7 +223,7 @@ update_dev() {
     fi
     # XUI_UPDATE_TAG tells update.sh to install the dev-latest pre-release
     # instead of the latest stable tag.
-    XUI_UPDATE_TAG="dev-latest" bash <(curl -Ls https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh)
+    XUI_UPDATE_TAG="dev-latest" run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh
     if [[ $? == 0 ]]; then
         LOGI "Dev update is complete, Panel has automatically restarted "
         before_show_menu
@@ -180,9 +237,9 @@ replace_xui_script() {
 
     rm -f "$temp_file"
     if [[ "$use_if_modified_since" == "true" ]]; then
-        curl -fLRo "$temp_file" -z /usr/bin/x-ui "$url"
+        download_github_file "$temp_file" "$url"
     else
-        curl -fLRo "$temp_file" "$url"
+        download_github_file "$temp_file" "$url"
     fi
     if [[ $? != 0 ]]; then
         rm -f "$temp_file"
@@ -238,10 +295,8 @@ legacy_version() {
         exit 1
     fi
     # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh") v$tag_version"
-
     echo "正在下载并安装面板版本 $tag_version..."
-    eval $install_command
+    run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh "v$tag_version"
 }
 
 # Function to handle the deletion of the script file
@@ -303,7 +358,7 @@ uninstall() {
     echo ""
     echo -e "卸载成功。\n"
     echo "如需重新安装面板，可以使用以下命令："
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls -H 'Accept: application/vnd.github.raw' 'https://api.github.com/repos/Fourgetu/3x-ui-cn-installer/contents/install-cn.sh?ref=main')${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM

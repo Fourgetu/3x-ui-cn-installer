@@ -240,6 +240,141 @@ def translate_file(src: Path, dst: Path) -> None:
     dst.write_text("".join(output), encoding="utf-8", newline="")
 
 
+def apply_raw_rate_limit_fallbacks(text: str, upstream: str, upstream_ref: str, target_raw_base: str) -> str:
+    if "download_github_file()" not in text:
+        helper = r'''
+github_raw_api_url() {
+    local url="$1" path owner repo ref
+    case "$url" in
+        https://raw.githubusercontent.com/*) ;;
+        *) return 1 ;;
+    esac
+
+    path="${url#https://raw.githubusercontent.com/}"
+    owner="${path%%/*}"
+    path="${path#*/}"
+    repo="${path%%/*}"
+    path="${path#*/}"
+    ref="${path%%/*}"
+    path="${path#*/}"
+
+    [[ -n "$owner" && -n "$repo" && -n "$ref" && -n "$path" ]] || return 1
+    printf 'https://api.github.com/repos/%s/%s/contents/%s?ref=%s\n' "$owner" "$repo" "$path" "$ref"
+}
+
+download_github_file() {
+    local output="$1" url="$2" api_url tmp
+    tmp="${output}.tmp.$$"
+
+    if curl -4fLR --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 -o "$tmp" "$url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    api_url="$(github_raw_api_url "$url")" || return 1
+
+    if curl -4fsSL --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 120 \
+        -H 'Accept: application/vnd.github.raw' -o "$tmp" "$api_url"; then
+        mv -f "$tmp" "$output"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 1
+}
+
+run_github_script() {
+    local url="$1" tmp rc
+    shift
+    tmp="$(mktemp)"
+
+    if ! download_github_file "$tmp" "$url"; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    bash "$tmp" "$@"
+    rc=$?
+    rm -f "$tmp"
+    return "$rc"
+}
+'''
+        match = re.search(r'is_domain\(\) \{\n.*?\n\}\n\n', text, flags=re.S)
+        if match:
+            text = text[: match.end()] + helper + text[match.end():]
+        else:
+            text = helper + "\n" + text
+
+    raw_repo_base = f"https://raw.githubusercontent.com/{upstream}/{upstream_ref}"
+    install_url = f"{target_raw_base}/install-cn.sh"
+    menu_url = f"{target_raw_base}/x-ui-cn.sh"
+    update_url = f"{raw_repo_base}/update.sh"
+
+    text = re.sub(
+        rf'bash <\(curl [^)]*["\']?{re.escape(install_url)}["\']?\)',
+        f"run_github_script {install_url}",
+        text,
+    )
+    text = re.sub(
+        rf'bash <\(curl [^)]*["\']?{re.escape(update_url)}["\']?\)',
+        f"run_github_script {update_url}",
+        text,
+    )
+    text = text.replace(
+        f"curl -4fLRo /usr/bin/x-ui-temp {menu_url}",
+        f"download_github_file /usr/bin/x-ui-temp {menu_url}",
+    )
+    text = text.replace(
+        f'curl -fLRo "${{xui_script_temp}}" {menu_url}',
+        f'download_github_file "${{xui_script_temp}}" {menu_url}',
+    )
+    text = text.replace(
+        f"curl -fLRo /usr/bin/x-ui {menu_url}",
+        f"download_github_file /usr/bin/x-ui {menu_url}",
+    )
+    text = text.replace(
+        f"curl -fLRo /usr/bin/x-ui -z /usr/bin/x-ui {menu_url}",
+        f"download_github_file /usr/bin/x-ui {menu_url}",
+    )
+    for service_name in ("x-ui.rc", "x-ui.service.debian", "x-ui.service.arch", "x-ui.service.rhel"):
+        text = text.replace(
+            f"curl -4fLRo /etc/init.d/x-ui {raw_repo_base}/{service_name}",
+            f"download_github_file /etc/init.d/x-ui {raw_repo_base}/{service_name}",
+        )
+        text = text.replace(
+            f'curl -fLRo "${{xui_rc_temp}}" {raw_repo_base}/{service_name}',
+            f'download_github_file "${{xui_rc_temp}}" {raw_repo_base}/{service_name}',
+        )
+        text = re.sub(
+            rf"curl -4fLRo (\$\{{xui_service\}}/x-ui\.service) {re.escape(raw_repo_base)}/{service_name}",
+            rf"download_github_file \1 {raw_repo_base}/{service_name}",
+            text,
+        )
+    text = text.replace(
+        'curl -fLRo "$temp_file" "$source" > /dev/null 2>&1',
+        'download_github_file "$temp_file" "$source" > /dev/null 2>&1',
+    )
+    text = text.replace(
+        'curl -fLRo "$temp_file" -z /usr/bin/x-ui "$url"',
+        'download_github_file "$temp_file" "$url"',
+    )
+    text = text.replace(
+        'curl -fLRo "$temp_file" "$url"',
+        'download_github_file "$temp_file" "$url"',
+    )
+
+    api_install_cmd = (
+        "bash <(curl -Ls -H 'Accept: application/vnd.github.raw' "
+        "'https://api.github.com/repos/Fourgetu/3x-ui-cn-installer/contents/install-cn.sh?ref=main')"
+    )
+    text = text.replace(
+        f"bash <(curl -Ls {install_url})",
+        api_install_cmd,
+    )
+    return text
+
+
 def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: str, release_repo: str) -> None:
     text = path.read_text(encoding="utf-8")
     upstream_owner, upstream_repo = upstream.split("/", 1)
@@ -283,38 +418,40 @@ def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: st
             f"https://github.com/{repo}/releases",
             f"https://github.com/{release_repo}/releases",
         )
-    text = text.replace(
-        "# If the panel is already installed but no certificate is configured, prompt for SSL now",
-        "# Existing installs should upgrade without stopping for SSL setup.\n"
-        "            # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
-    )
-    text = text.replace(
-        "# Existing install: if no cert configured, prompt user for SSL setup",
-        "# Existing installs should upgrade without stopping for SSL setup.\n"
-        "        # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
-    )
-    text = text.replace(
-        'prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"',
-        'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
-        '                    prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"\n'
-        '                else\n'
-        '                    SSL_SCHEME="http"\n'
-        '                    SSL_HOST="${server_ip}"\n'
-        '                    echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
-        '                    echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
-        '                fi',
-    )
-    text = text.replace(
-        'prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"',
-        'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
-        '                prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"\n'
-        '            else\n'
-        '                SSL_SCHEME="http"\n'
-        '                SSL_HOST="${server_ip}"\n'
-        '                echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
-        '                echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
-        '            fi',
-    )
+    if "XUI_SSL_PROMPT" not in text:
+        text = text.replace(
+            "# If the panel is already installed but no certificate is configured, prompt for SSL now",
+            "# Existing installs should upgrade without stopping for SSL setup.\n"
+            "            # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
+        )
+        text = text.replace(
+            "# Existing install: if no cert configured, prompt user for SSL setup",
+            "# Existing installs should upgrade without stopping for SSL setup.\n"
+            "        # Set XUI_SSL_PROMPT=1 when you explicitly want this installer to ask.",
+        )
+        text = text.replace(
+            'prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"',
+            'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
+            '                    prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"\n'
+            '                else\n'
+            '                    SSL_SCHEME="http"\n'
+            '                    SSL_HOST="${server_ip}"\n'
+            '                    echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
+            '                    echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
+            '                fi',
+        )
+        text = text.replace(
+            'prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"',
+            'if [[ "${XUI_SSL_PROMPT:-0}" == "1" ]]; then\n'
+            '                prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"\n'
+            '            else\n'
+            '                SSL_SCHEME="http"\n'
+            '                SSL_HOST="${server_ip}"\n'
+            '                echo -e "${yellow}Existing install has no SSL certificate; skipping SSL setup during upgrade.${plain}"\n'
+            '                echo -e "${yellow}Run with XUI_SSL_PROMPT=1 if you want to configure SSL now.${plain}"\n'
+            '            fi',
+        )
+    text = apply_raw_rate_limit_fallbacks(text, upstream, upstream_ref, target_raw_base)
     path.write_text(text, encoding="utf-8", newline="")
 
 
