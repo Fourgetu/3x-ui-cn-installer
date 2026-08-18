@@ -50,17 +50,6 @@ is_domain() {
     [[ "$1" =~ ^([A-Za-z0-9](-*[A-Za-z0-9])*\.)+(xn--[a-z0-9]{2,}|[A-Za-z]{2,})$ ]] && return 0 || return 1
 }
 
-# acme.sh's standalone server binds IPv4 by default; --listen-v6 makes it
-# v6-only, which breaks HTTP-01 validation when the domain's A record points
-# at this host's IPv4 (#4994). Only force IPv6 when the host has no global
-# IPv4 address at all.
-acme_listen_flag() {
-    if ip -4 addr show scope global 2> /dev/null | grep -q "inet "; then
-        echo ""
-    else
-        echo "--listen-v6"
-    fi
-}
 
 github_raw_api_url() {
     local url="$1" path owner repo ref
@@ -117,6 +106,17 @@ run_github_script() {
     rc=$?
     rm -f "$tmp"
     return "$rc"
+}
+# acme.sh's standalone server binds IPv4 by default; --listen-v6 makes it
+# v6-only, which breaks HTTP-01 validation when the domain's A record points
+# at this host's IPv4 (#4994). Only force IPv6 when the host has no global
+# IPv4 address at all.
+acme_listen_flag() {
+    if ip -4 addr show scope global 2> /dev/null | grep -q "inet "; then
+        echo ""
+    else
+        echo "--listen-v6"
+    fi
 }
 
 # check root
@@ -295,8 +295,10 @@ legacy_version() {
         exit 1
     fi
     # Use the entered panel version in the download link
+    install_command="run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh v$tag_version"
+
     echo "正在下载并安装面板版本 $tag_version..."
-    run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh "v$tag_version"
+    eval $install_command
 }
 
 # Function to handle the deletion of the script file
@@ -358,7 +360,7 @@ uninstall() {
     echo ""
     echo -e "卸载成功。\n"
     echo "如需重新安装面板，可以使用以下命令："
-    echo -e "${green}bash <(curl -Ls -H 'Accept: application/vnd.github.raw' 'https://api.github.com/repos/Fourgetu/3x-ui-cn-installer/contents/install-cn.sh?ref=main')${plain}"
+    echo -e "${green}run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/install-cn.sh${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM

@@ -64,6 +64,7 @@ is_domain() {
     [[ "$1" =~ ^([A-Za-z0-9](-*[A-Za-z0-9])*\.)+(xn--[a-z0-9]{2,}|[A-Za-z]{2,})$ ]] && return 0 || return 1
 }
 
+
 github_raw_api_url() {
     local url="$1" path owner repo ref
     case "$url" in
@@ -105,6 +106,21 @@ download_github_file() {
     return 1
 }
 
+run_github_script() {
+    local url="$1" tmp rc
+    shift
+    tmp="$(mktemp)"
+
+    if ! download_github_file "$tmp" "$url"; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    bash "$tmp" "$@"
+    rc=$?
+    rm -f "$tmp"
+    return "$rc"
+}
 # acme.sh's standalone server binds IPv4 by default; --listen-v6 makes it
 # v6-only, which breaks HTTP-01 validation when the domain's A record points
 # at this host's IPv4 (#4994). Only force IPv6 when the host has no global
