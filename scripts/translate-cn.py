@@ -364,14 +364,6 @@ run_github_script() {
         'download_github_file "$temp_file" "$url"',
     )
 
-    api_install_cmd = (
-        "bash <(curl -Ls -H 'Accept: application/vnd.github.raw' "
-        "'https://api.github.com/repos/Fourgetu/3x-ui-cn-installer/contents/install-cn.sh?ref=main')"
-    )
-    text = text.replace(
-        f"bash <(curl -Ls {install_url})",
-        api_install_cmd,
-    )
     return text
 
 
