@@ -1,1 +1,1 @@
-v3.6.0-fourgetu.3
+v3.7.0-fourgetu.1
