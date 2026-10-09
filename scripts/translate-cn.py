@@ -379,6 +379,16 @@ def patch_urls(path: Path, upstream: str, upstream_ref: str, target_raw_base: st
             text = text.replace(f"{base}/install.sh", f"{target_raw_base}/install-cn.sh")
             text = text.replace(f"{base}/x-ui.sh", f"{target_raw_base}/x-ui-cn.sh")
 
+        # Release-pinned installers use ${script_ref} or v${ver}; keep their
+        # menu/install refreshes Chinese while preserving tagged service files.
+        base_pattern = re.escape(f"https://raw.githubusercontent.com/{owner}/{upstream_repo}/")
+        for source, target in (("install.sh", "install-cn.sh"), ("x-ui.sh", "x-ui-cn.sh")):
+            text = re.sub(
+                base_pattern + r"[^\"' )]+/" + re.escape(source),
+                f"{target_raw_base}/{target}",
+                text,
+            )
+
     # Keep release assets on the official upstream, but make menu/install script refreshes stay Chinese.
     text = re.sub(
         r"https://raw\.githubusercontent\.com/[Mm][Hh][Ss]anaei/3x-ui/[^\"' )]+/install\.sh",
