@@ -205,11 +205,28 @@ update() {
         fi
         return 0
     fi
-    run_github_script https://raw.githubusercontent.com/Fourgetu/3x-ui/main/update.sh
-    if [[ $? == 0 ]]; then
+    local update_tag update_url
+    update_tag=$(curl -fsSL --retry 3 --connect-timeout 15 --max-time 60 https://api.github.com/repos/Fourgetu/3x-ui/releases/latest | sed -nE 's/.*"tag_name": *"([^"]+)".*/\1/p' | head -n1)
+    if [[ ! "$update_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-fourgetu\.[0-9]+)?$ ]]; then
+        LOGE "Failed to resolve the latest Fourgetu release"
+        return 1
+    fi
+    update_url="https://raw.githubusercontent.com/Fourgetu/3x-ui/${update_tag}/update.sh"
+    local update_script update_result
+    update_script=$(mktemp) || return 1
+    if ! curl -fLs --retry 3 --connect-timeout 15 --max-time 60 -o "$update_script" "$update_url"; then
+        rm -f "$update_script"
+        LOGE "Failed to download the Fourgetu updater"
+        return 1
+    fi
+    XUI_UPDATE_TAG="$update_tag" bash "$update_script"
+    update_result=$?
+    rm -f "$update_script"
+    if [[ $update_result == 0 ]]; then
         LOGI "更新 is complete, Panel has automatically restarted "
         before_show_menu
     fi
+    return "$update_result"
 }
 
 update_dev() {
@@ -265,6 +282,19 @@ replace_xui_script() {
     return 0
 }
 
+# The menu must match the installed panel, so update it from that release's
+# tag; fall back to main only when no script is published for the version.
+installed_script_url() {
+    local ver
+    ver=$("${xui_folder}/x-ui" -v 2> /dev/null | tr -d '[:space:]')
+    if [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-fourgetu\.[0-9]+)?$ ]] && curl -fsIL -o /dev/null "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh"; then
+        echo "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh"
+    else
+        echo -e "${yellow}否 x-ui.sh published for the installed version (${ver:-unknown}), using main${plain}" >&2
+        echo "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh"
+    fi
+}
+
 update_menu() {
     echo -e "${yellow}正在更新菜单${plain}"
     confirm "This function will update the menu to the latest changes." "y"
@@ -276,7 +306,7 @@ update_menu() {
         return 0
     fi
 
-    if replace_xui_script "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh" "false"; then
+    if replace_xui_script "$(installed_script_url)" "false"; then
         chmod +x ${xui_folder}/x-ui.sh
         echo -e "${green}更新成功，面板已自动重启。${plain}"
         exit 0
@@ -893,7 +923,7 @@ enable_bbr() {
 }
 
 update_shell() {
-    if replace_xui_script "https://raw.githubusercontent.com/Fourgetu/3x-ui-cn-installer/main/x-ui-cn.sh" "true"; then
+    if replace_xui_script "$(installed_script_url)" "true"; then
         LOGI "Upgrade script succeeded, Please rerun the script"
         before_show_menu
     else
@@ -941,7 +971,8 @@ check_status() {
         if [[ ! -f ${xui_service}/x-ui.service ]]; then
             return 2
         fi
-        temp=$(systemctl status x-ui | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+        temp=$(systemctl show --property=SubState x-ui)
+        temp=${temp#SubState=}
         if [[ "${temp}" == "running" ]]; then
             return 0
         else
@@ -2361,7 +2392,17 @@ setup_fail2ban_iplimit() {
             centos)
                 if [[ "${VERSION_ID}" =~ ^7 ]]; then
                     yum makecache -y && yum install epel-release -y
+                    # On EL7 fail2ban pulls in firewalld, which is enabled on the
+                    # next boot and blocks every panel/inbound port. The IP Limit
+                    # jail uses raw iptables, so a firewalld that was not there
+                    # before is not needed: keep it from starting on reboot.
+                    rpm -q firewalld &> /dev/null && had_firewalld=1 || had_firewalld=0
                     yum -y install fail2ban nftables
+                    if [[ "${had_firewalld}" == "0" ]] && rpm -q firewalld &> /dev/null; then
+                        systemctl disable firewalld 2> /dev/null
+                        echo -e "${yellow}firewalld was pulled in by fail2ban and has been disabled so it does not block your ports after a reboot.${plain}
+"
+                    fi
                 else
                     dnf makecache -y && dnf -y install fail2ban nftables
                 fi
@@ -2549,9 +2590,14 @@ create_iplimit_jails() {
     # Uncomment 'allowipv6 = auto' in fail2ban.conf
     sed -i 's/#allowipv6 = auto/allowipv6 = auto/g' /etc/fail2ban/fail2ban.conf
 
-    # On Debian 12+ and Ubuntu 22.04+ fail2ban's default backend should be changed to systemd
-    if [[ ( "${release}" == "debian" && ${os_version} -ge 12 ) || ( "${release}" == "ubuntu" && ${os_version} -ge 2200 ) ]]; then
-        sed -i '0,/action =/s/backend = auto/backend = systemd/' /etc/fail2ban/jail.conf
+    # Debian 12+ / Ubuntu 22.04+ log sshd to the journal only; a jail.d override
+    # survives package upgrades. Only the stock 'backend = auto' is overridden.
+    if [[ ( "${release}" == "debian" && ${os_version} -ge 12 ) || ( "${release}" == "ubuntu" && ${os_version} -ge 2200 ) ]] &&
+        sed -n '0,/action =/p' /etc/fail2ban/jail.conf | grep -q '^backend = auto'; then
+        cat << EOF > /etc/fail2ban/jail.d/3x-ipl-backend.conf
+[DEFAULT]
+backend = systemd
+EOF
     fi
 
     cat << EOF > /etc/fail2ban/jail.d/3x-ipl.conf
