@@ -40,7 +40,7 @@ arch() {
 
 echo "Arch: $(arch)"
 
-# 否n-interactive mode: triggered explicitly via XUI_NONINTERACTIVE=1, or
+# Non-interactive mode: triggered explicitly via XUI_NONINTERACTIVE=1, or
 # implicitly when stdin is not a TTY (e.g. `curl ... | bash`, cloud-init).
 # In this mode every prompt below is replaced by an env var or a sane default.
 if [[ "${XUI_NONINTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
@@ -188,7 +188,7 @@ gen_random_string() {
 }
 
 # prompt_or_default VARNAME "prompt text" "default" [ENV_NAME]
-# Interactive: read into VARNAME. 否n-interactive: VARNAME = ${ENV_NAME:-default}.
+# Interactive: read into VARNAME. Non-interactive: VARNAME = ${ENV_NAME:-default}.
 # ENV_NAME defaults to VARNAME when omitted. Keeps every interactive prompt
 # string byte-for-byte identical to the original `read -rp`.
 prompt_or_default() {
@@ -507,7 +507,7 @@ setup_ssl_certificate() {
 
     # Issue certificate
     echo -e "${green}正在为此域名申请 SSL 证书： ${domain}...${plain}"
-    echo -e "${yellow}否te: 80 端口必须开放并可从公网访问${plain}"
+    echo -e "${yellow}Note: 80 端口必须开放并可从公网访问${plain}"
 
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force > /dev/null 2>&1
     ~/.acme.sh/acme.sh --issue -d ${domain} $(acme_listen_flag) --standalone --httpport 80 --force
@@ -558,7 +558,7 @@ setup_ip_certificate() {
     local ipv6="$2" # optional
 
     echo -e "${green}Setting up Let's Encrypt IP certificate (shortlived profile)...${plain}"
-    echo -e "${yellow}否te: IP certificates are valid for ~6 days and will auto-renew.${plain}"
+    echo -e "${yellow}Note: IP certificates are valid for ~6 days and will auto-renew.${plain}"
     echo -e "${yellow}Default listener is port 80. If you choose another port, ensure external port 80 forwards to it.${plain}"
 
     # Check for acme.sh
@@ -598,7 +598,7 @@ setup_ip_certificate() {
     # Choose port for HTTP-01 listener (default 80, prompt override)
     local WebPort=""
     prompt_or_default WebPort "Port to use for ACME HTTP-01 listener (default 80): " "80" XUI_ACME_HTTP_PORT
-    WebPort="${Web端口：-80}"
+    WebPort="${WebPort:-80}"
     if ! [[ "${WebPort}" =~ ^[0-9]+$ ]] || ((WebPort < 1 || WebPort > 65535)); then
         echo -e "${red}Invalid port provided. Falling back to 80.${plain}"
         WebPort=80
@@ -663,7 +663,7 @@ setup_ip_certificate() {
     echo -e "${green}Certificate issued successfully, installing...${plain}"
 
     # 安装 certificate
-    # 否te: acme.sh may report "Reload error" and exit non-zero if reloadcmd fails,
+    # Note: acme.sh may report "Reload error" and exit non-zero if reloadcmd fails,
     # but the cert files are still installed. We check for files instead of exit code.
     ~/.acme.sh/acme.sh --installcert --force -d ${ipv4} \
         --key-file "${certDir}/privkey.pem" \
@@ -940,8 +940,8 @@ prompt_and_setup_ssl() {
     echo -e "${green}2.${plain} Let's Encrypt IP 证书 (6-day validity, auto-renews)"
     echo -e "${green}3.${plain} 自定义 SSL 证书 (Path to existing files)"
     echo -e "${green}4.${plain} 跳过 SSL (advanced — behind reverse proxy / SSH tunnel only)"
-    echo -e "${blue}否te:${plain} Options 1 & 2 require port 80 open. Option 3 requires manual paths."
-    echo -e "${blue}否te:${plain} Option 4 serves the panel over plain HTTP — only safe behind nginx/Caddy or an SSH tunnel."
+    echo -e "${blue}Note:${plain} Options 1 & 2 require port 80 open. Option 3 requires manual paths."
+    echo -e "${blue}Note:${plain} Option 4 serves the panel over plain HTTP — only safe behind nginx/Caddy or an SSH tunnel."
     if [[ "$NONINTERACTIVE" == "1" ]]; then
         case "${XUI_SSL_MODE:-none}" in
             domain) ssl_choice="1" ;;
@@ -1083,7 +1083,7 @@ prompt_and_setup_ssl() {
             fi
 
             echo -e "${green}✓ Custom certificate paths applied.${plain}"
-            echo -e "${yellow}否te: You are responsible for renewing these files externally.${plain}"
+            echo -e "${yellow}Note: You are responsible for renewing these files externally.${plain}"
 
             systemctl restart x-ui > /dev/null 2>&1 || rc-service x-ui restart > /dev/null 2>&1
             ;;
@@ -1488,7 +1488,7 @@ EOF
 # by invoking the freshly installed x-ui CLI. IP Limit is load-bearing on
 # fail2ban (without it the panel disables the limitIp field and zeroes existing
 # limits), so a fresh install should make it work out of the box, just like the
-# Docker image already does. 否n-fatal by design: a fail2ban failure must never
+# Docker image already does. Non-fatal by design: a fail2ban failure must never
 # abort the panel install.
 setup_fail2ban() {
     if [[ -n "${XUI_ENABLE_FAIL2BAN+x}" && "${XUI_ENABLE_FAIL2BAN}" != "true" ]]; then
@@ -1553,8 +1553,8 @@ _xui_warn_unsupported_hardening() {
         fi
     done
     [[ -n "$missing" ]] || return 0
-    echo -e "${yellow}否te: systemd ${version} ignores part of the hardening in x-ui.service; the panel still starts.${plain}"
-    echo "      否t applied, needs a newer systemd: ${missing}."
+    echo -e "${yellow}Note: systemd ${version} ignores part of the hardening in x-ui.service; the panel still starts.${plain}"
+    echo "      Not applied, needs a newer systemd: ${missing}."
     if [[ "$version" -lt 231 ]]; then
         echo "      The panel's folders stay writable through ReadWriteDirectories=, the alias this script installs."
     fi
@@ -1965,7 +1965,7 @@ install_x-ui() {
         rm -rf "${custom_bin_backup}"
         custom_bin_backup=""
         if [[ ${#restored_custom_bin[@]} -gt 0 ]]; then
-            echo -e "${green}恢复d custom file(s) in bin/ not shipped by this release: ${restored_custom_bin[*]}${plain}"
+            echo -e "${green}Restored custom file(s) in bin/ not shipped by this release: ${restored_custom_bin[*]}${plain}"
         fi
     fi
     trap - EXIT INT TERM

@@ -1,0 +1,29 @@
+name: Test Chinese installer
+
+on:
+  push:
+    paths:
+      - '**.sh'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '**.sh'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check shell syntax and translation regressions
+        run: |
+          for script in install-cn.sh x-ui-cn.sh scripts/sync-official.sh; do
+            bash -n "$script"
+          done
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v

@@ -190,12 +190,51 @@ MENU_ITEMS = {
 
 
 def translate_text(text: str) -> str:
+    # Parameter expansions contain executable shell syntax and defaults, not
+    # display text. Preserve the whole expansion, including nested expansions.
+    parts = []
+    start = 0
+    while True:
+        opening = text.find("${", start)
+        if opening < 0:
+            parts.append(_translate_literal_text(text[start:]))
+            return "".join(parts)
+        parts.append(_translate_literal_text(text[start:opening]))
+        end = opening + 2
+        depth = 1
+        quote = None
+        while end < len(text) and depth:
+            if text[end] == "\\":
+                end += 2
+                continue
+            if quote:
+                if text[end] == quote:
+                    quote = None
+            elif text[end] in ("'", '"'):
+                quote = text[end]
+            elif text[end] == "{":
+                depth += 1
+            elif text[end] == "}":
+                depth -= 1
+            end += 1
+        # An unfinished expansion is kept unchanged rather than guessing.
+        parts.append(text[opening:end])
+        start = end
+
+
+def _replace_phrase(text: str, source: str, target: str) -> str:
+    # Do not translate fragments of identifiers/words (WebPort, Note, Restored).
+    pattern = rf"(?:(?<![A-Za-z0-9_$])|(?<=\\n)|(?<=\\t)|(?<=\\r)){re.escape(source)}(?![A-Za-z0-9_])"
+    return re.sub(pattern, lambda match: target, text)
+
+
+def _translate_literal_text(text: str) -> str:
     translated = text
-    for source, target in PHRASES:
-        translated = translated.replace(source, target)
+    for source, target in sorted(PHRASES, key=lambda pair: len(pair[0]), reverse=True):
+        translated = _replace_phrase(translated, source, target)
 
     for source, target in MENU_ITEMS.items():
-        translated = re.sub(rf"(?<![A-Za-z]){re.escape(source)}(?![A-Za-z])", target, translated)
+        translated = _replace_phrase(translated, source, target)
 
     translated = translated.replace("[Default", "[默认")
     translated = translated.replace("default is a random username", "默认随机用户名")
@@ -235,9 +274,7 @@ def translate_text(text: str) -> str:
 
 def translate_file(src: Path, dst: Path) -> None:
     original = src.read_text(encoding="utf-8")
-    lines = original.splitlines(keepends=True)
-    output = [translate_text(line) for line in lines]
-    dst.write_text("".join(output), encoding="utf-8", newline="")
+    dst.write_text(translate_text(original), encoding="utf-8", newline="")
 
 
 def apply_raw_rate_limit_fallbacks(text: str, upstream: str, upstream_ref: str, target_raw_base: str) -> str:

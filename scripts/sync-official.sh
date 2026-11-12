@@ -86,6 +86,12 @@ curl -fsSL "https://api.github.com/repos/${RELEASE_REPO}/releases/latest" \
     | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data["tag_name"])' \
     > upstream-version.txt
 
+# Never publish generated scripts that fail syntax or executable regressions.
+for script in install-cn.sh x-ui-cn.sh; do
+    bash -n "$script"
+done
+python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
 chmod +x install-cn.sh x-ui-cn.sh
 
 echo "Synced ${UPSTREAM_REPO}@${UPSTREAM_REF} into ${TARGET_REPO}@${TARGET_BRANCH}"
